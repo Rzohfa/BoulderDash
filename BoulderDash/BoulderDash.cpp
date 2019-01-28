@@ -8,6 +8,7 @@
 #include <SFML/Graphics.hpp>
 #include <thread>
 #include <Windows.h>
+#include "backend.h"
 
 void readLevel(char **map, int lvl) {
 	std::string name = "maps/map" + std::to_string(lvl) + ".txt";
@@ -19,27 +20,34 @@ void readLevel(char **map, int lvl) {
 			is >> map[i][j];
 }
 
-struct player {
-	unsigned short int x, y, points = 0, p_rem = 0, _x, _y, hp, finished = 0; //finished - 0: no, 1: yes
-};
-
-void moveStoneTh(char **map, player P) {
-	while (P.finished == 0) {
+void moveStoneTh(char **map, player P, bool **moves) {
+	while (!sf::Keyboard::isKeyPressed(sf::Keyboard::Q)) {
 		Sleep(1000);
 		for (int i = 0; i < 16; i++) {
 			for (int j = 1; j < 102; j++) {
+				if (moves[i][j] == true && map[i][j] == 'S' && map[i + 1][j] == 'X') {
+					P.decHP();
+					std::cout << "ded" << P.hp << "\n";
+					moves[i][j] = false;
+				}
 				if (map[i][j] == 'S') {
 					if (map[i + 1][j] == 'A') {
 						map[i][j] = 'A';
 						map[i + 1][j] = 'S';
+						moves[i + 1][j] = true;
+						moves[i][j] = false;
 					}
-					else if (map[i + 1][j + 1] == 'A') {
+					else if (map[i + 1][j + 1] == 'A' && map[i][j + 1] != 'D') {
 						map[i][j] = 'A';
 						map[i][j + 1] = 'S';
+						moves[i][j + 1] = true;
+						moves[i][j] = false;
 					}
-					else if (map[i + 1][j - 1] == 'A') {
+					else if (map[i + 1][j - 1] == 'A' && map[i][j - 1] != 'D') {
 						map[i][j] = 'A';
 						map[i][j - 1] = 'S';
+						moves[i][j - 1] = true;
+						moves[i][j] = false;
 					}
 				}
 			}
@@ -81,6 +89,38 @@ void drawMap(char **map, sf::Sprite *sprites, sf::Sprite **bar, sf::RenderTarget
 		}
 	}
 	
+	bar[0][0].setPosition(sf::Vector2f(4.f, 4.f));
+	bar[0][1].setPosition(sf::Vector2f(100.f, 4.f));
+	bar[0][2].setPosition(sf::Vector2f(115.f, 4.f));
+	bar[0][0].setScale(4, 4);
+	bar[0][1].setScale(4, 4);
+	bar[0][2].setScale(4, 4);
+	window.draw(bar[0][0]);
+	window.draw(bar[0][1]);
+	if(P.p_rem - P.points == 10)
+		window.draw(bar[0][2]);
+
+	bar[1][0].setScale(4, 4);
+	for (int i = 0; i < 3; i++) {
+		if (i < P.hp) {
+			bar[1][0].setPosition(sf::Vector2f(170 + i * 30, 4.f));
+			window.draw(bar[1][0]);
+		}
+		else {
+			bar[1][1].setPosition(sf::Vector2f(170 + i * 30, 4.f));
+			window.draw(bar[1][1]);
+		}
+	}
+
+	for (int i = 0; i < 3; i++)
+		bar[3][i].setScale(4, 4);
+
+	bar[3][0].setPosition(sf::Vector2f(300.f, 4.f));
+	bar[3][1].setPosition(sf::Vector2f(420.f, 4.f));
+	bar[3][2].setPosition(sf::Vector2f(435.f, 4.f));
+
+	for (int i = 0; i < 3; i++)
+		window.draw(bar[3][i]);
 
 }
 
@@ -94,6 +134,27 @@ int main()
 	int level = 1;
 
 	int off_y = window.getSize().y / 180, off_x = window.getSize().x / 180;
+
+	char** map = new char*[17];
+	for (int i = 0; i < 17; i++)
+		map[i] = new char[103];
+
+	readLevel(map, level);
+
+	for (int i = 0; i < 17; i++) {
+		for (int j = 0; j < 103; j++) {
+			std::cout << map[i][j] << "";
+			if (map[i][j] == 'X') {
+				P.x = j;
+				P.y = i;
+				P._x = j;
+				P._y = i;
+			}
+			else if (map[i][j] == 'P')
+				P.p_rem++;
+		}
+		std::cout << "\n";
+	}
 
 	sf::Texture texture;
 	if (!texture.loadFromFile("BDtex.png"))
@@ -122,13 +183,14 @@ int main()
 
 	sf::Sprite **bar = new sf::Sprite*[4];
 	bar[0] = new sf::Sprite[3];
-	bar[1] = new sf::Sprite[1];
+	bar[1] = new sf::Sprite[2];
 	bar[2] = new sf::Sprite[4];
 	bar[3] = new sf::Sprite[3];
 
 	for (int i = 0; i < 3; i++)
 		bar[0][i].setTexture(text);
-	bar[1][0].setTexture(text);
+	for (int i = 0; i < 2; i++)
+		bar[1][0].setTexture(text);
 	for (int i = 0; i < 4; i++)
 		bar[2][i].setTexture(text);
 	for (int i = 0; i < 3; i++)
@@ -138,14 +200,15 @@ int main()
 	bar[2][0].setTextureRect(sf::IntRect(0,12,24,5));
 	bar[3][0].setTextureRect(sf::IntRect(0,18,24,5));
 
-	if (P.p_rem == 10) {
+	if (P.p_rem - P.points == 10) {
 		bar[0][1].setTextureRect(sf::IntRect(4, 0, 3, 5));
 		bar[0][2].setTextureRect(sf::IntRect(0, 0, 3, 5));
 	}
 	else
-		bar[0][1].setTextureRect(sf::IntRect((P.p_rem + P.p_rem * 3), 0, 3, 5));
+		bar[0][1].setTextureRect(sf::IntRect(((P.p_rem-P.points) + (P.p_rem - P.points) * 3), 0, 3, 5));
 
 	bar[1][0].setTextureRect(sf::IntRect(42, 0, 7, 6));
+	bar[1][1].setTextureRect(sf::IntRect(42, 20, 7, 6));
 
 	bar[2][3].setTextureRect(sf::IntRect(((level % 10) * 3) + (level % 10), 0, 3, 5));
 	bar[2][2].setTextureRect(sf::IntRect((((level / 10) % 10) * 3) + ((level / 10) % 10), 0, 3, 5));
@@ -154,34 +217,28 @@ int main()
 	bar[3][2].setTextureRect(sf::IntRect(((level % 10) * 3) + (level % 10), 0, 3, 5));
 	bar[3][1].setTextureRect(sf::IntRect((((level/10) % 10) * 3) + ((level / 10) % 10), 0, 3, 5));
 
-	char** map = new char*[17];
+	bool** movedStone = new bool*[17];
 	for (int i = 0; i < 17; i++)
-		map[i] = new char[103];
+		movedStone[i] = new bool[103];
 
-	readLevel(map, level);
+	for (int i = 0; i < 17; i++)
+		for (int j = 0; j < 103; j++)
+			movedStone[i][j] = false;
 
-	for (int i = 0; i < 17; i++) {
-		for (int j = 0; j < 103; j++) {
-				std::cout << map[i][j] << "";
-				if (map[i][j] == 'X') {
-					P.x = j;
-					P.y = i;
-					P._x = j;
-					P._y = i;
-				}
-				else if (map[i][j] == 'P')
-					P.p_rem++;
-			}
-			std::cout << "\n";
-	}
-
-	std::thread t1(moveStoneTh, map, P);
+	std::thread t1(moveStoneTh, map, P, movedStone);
 
 	while (window.isOpen())
 	{
 		window.clear();
 		drawMap(map, sprites, bar, window, off_x, off_y, P);
 		sf::Event event;
+		
+		bar[1][0].setScale(4, 4);
+		for (int i = 0; i < P.hp; i++) {
+			bar[1][0].setPosition(sf::Vector2f(170 + i * 30, 4.f));
+			window.draw(bar[1][0]);
+		}
+
 		while (window.pollEvent(event))
 		{
 			if (event.type == sf::Event::Closed)
@@ -211,8 +268,15 @@ int main()
 						}
 					}
 					else if (map[P.y - 1][P.x] != 'B' && map[P.y - 1][P.x] != 'S' && map[P.y - 1][P.x] != 'E') {
-						if (map[P.y - 1][P.x] == 'P')
+						if (map[P.y - 1][P.x] == 'P') {
 							P.points++;
+							if (P.p_rem - P.points == 10) {
+								bar[0][1].setTextureRect(sf::IntRect(4, 0, 3, 5));
+								bar[0][2].setTextureRect(sf::IntRect(0, 0, 3, 5));
+							}
+							else
+								bar[0][1].setTextureRect(sf::IntRect(((P.p_rem - P.points) + (P.p_rem - P.points) * 3), 0, 3, 5));
+						}
 						map[P.y][P.x] = 'A';
 						P.y--;
 						map[P.y][P.x] = 'X';
@@ -242,8 +306,15 @@ int main()
 						off_x = window.getSize().x / 180;
 					}
 					else if (map[P.y + 1][P.x] != 'B' && map[P.y + 1][P.x] != 'S' && map[P.y + 1][P.x] != 'E') {
-						if (map[P.y + 1][P.x] == 'P')
+						if (map[P.y + 1][P.x] == 'P') {
 							P.points++;
+							if (P.p_rem - P.points == 10) {
+								bar[0][1].setTextureRect(sf::IntRect(4, 0, 3, 5));
+								bar[0][2].setTextureRect(sf::IntRect(0, 0, 3, 5));
+							}
+							else
+								bar[0][1].setTextureRect(sf::IntRect(((P.p_rem - P.points) + (P.p_rem - P.points) * 3), 0, 3, 5));
+						}
 						map[P.y][P.x] = 'A';
 						P.y++;
 						map[P.y][P.x] = 'X';
@@ -273,8 +344,15 @@ int main()
 						off_x = window.getSize().x / 180;
 					}
 					else if (map[P.y][P.x - 1] != 'B' && map[P.y][P.x - 1] != 'S' && map[P.y][P.x - 1] != 'E') {
-						if (map[P.y][P.x - 1] == 'P')
+						if (map[P.y][P.x - 1] == 'P') {
 							P.points++;
+							if (P.p_rem - P.points == 10) {
+								bar[0][1].setTextureRect(sf::IntRect(4, 0, 3, 5));
+								bar[0][2].setTextureRect(sf::IntRect(0, 0, 3, 5));
+							}
+							else
+								bar[0][1].setTextureRect(sf::IntRect(((P.p_rem - P.points) + (P.p_rem - P.points) * 3), 0, 3, 5));
+						}
 						map[P.y][P.x] = 'A';
 						P.x--;
 						map[P.y][P.x] = 'X';
@@ -305,8 +383,15 @@ int main()
 
 					}
 					else if (map[P.y][P.x + 1] != 'B' && map[P.y][P.x + 1] != 'S' && map[P.y][P.x + 1] != 'E') {
-						if (map[P.y][P.x + 1] == 'P')
+						if (map[P.y][P.x + 1] == 'P') {
 							P.points++;
+							if (P.p_rem - P.points == 10) {
+								bar[0][1].setTextureRect(sf::IntRect(4, 0, 3, 5));
+								bar[0][2].setTextureRect(sf::IntRect(0, 0, 3, 5));
+							}
+							else
+								bar[0][1].setTextureRect(sf::IntRect(((P.p_rem - P.points) + (P.p_rem - P.points) * 3), 0, 3, 5));
+						}
 						map[P.y][P.x] = 'A';
 						P.x++;
 						map[P.y][P.x] = 'X';
@@ -321,12 +406,12 @@ int main()
 
 		if (sf::Keyboard::isKeyPressed(sf::Keyboard::Q))
 		{
-			P.finished = 1;
 			t1.join();
 			window.close();
 		}
 		if (sf::Keyboard::isKeyPressed(sf::Keyboard::R))
 		{
+			std::cout << P.hp << "\n";
 			readLevel(map, level);
 			P.x = P._x;
 			P.y = P._y;
@@ -338,7 +423,7 @@ int main()
 		if (P.points == 10)
 			sprites[4].setTextureRect(sf::IntRect(0, 64, 64, 64));
 
-		std::cout << P.points << "\n";
+		//std::cout << P.points << "\n";
 		
 	}
 
